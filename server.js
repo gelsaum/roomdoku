@@ -12,7 +12,8 @@ const io = new Server(server, {
   cors: { origin: '*' }
 });
 
-const PORT = Number(process.env.PORT) || 3000;
+const DEFAULT_PORT = Number(process.env.PORT) || 3080;
+let activePort = DEFAULT_PORT;
 
 // Carregar os tabuleiros oficiais extraídos via REA do Zoodoku APK
 const puzzlesPath = path.join(__dirname, 'public', 'data', 'puzzles.json');
@@ -51,7 +52,7 @@ app.get('/api/info', (req, res) => {
   }
   res.json({
     localIps: addresses,
-    port: PORT,
+    port: activePort,
     httpsUrl: process.env.PUBLIC_URL || publicHttpsUrl,
     totalUniqueExtractedFromApk: 58160,
     totalInFastPool: totalSaved,
@@ -467,23 +468,49 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Roomdoku rodando em http://0.0.0.0:${PORT}`);
-  const cfBinary = path.join(__dirname, 'cloudflared.exe');
-  const shouldStartTunnel =
-    process.platform === 'win32' &&
-    process.env.NODE_ENV !== 'production' &&
-    process.env.ENABLE_LOCAL_TUNNEL !== 'false' &&
-    fs.existsSync(cfBinary);
-  if (shouldStartTunnel) {
-    startCloudflareTunnel(cfBinary);
+function startServer(port, attemptsLeft = 20) {
+  function attachListenHandlers(targetPort, remaining) {
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE' && remaining > 0) {
+        const nextPort = targetPort + 1;
+        console.log(`Porta ${targetPort} já está em uso. Tentando porta ${nextPort}...`);
+        server.listen(nextPort, '0.0.0.0');
+        attachListenHandlers(nextPort, remaining - 1);
+      } else if (err.code === 'EADDRINUSE') {
+        console.log('Selecionando uma porta livre automaticamente...');
+        server.listen(0, '0.0.0.0');
+        attachListenHandlers(0, 0);
+      } else {
+        throw err;
+      }
+    });
   }
-});
 
-function startCloudflareTunnel(cfBinary) {
+  server.once('listening', () => {
+    const addr = server.address();
+    activePort = addr && typeof addr === 'object' ? addr.port : port;
+    console.log(`Roomdoku rodando em http://0.0.0.0:${activePort}`);
+    const cfBinary = path.join(__dirname, 'cloudflared.exe');
+    const shouldStartTunnel =
+      process.platform === 'win32' &&
+      process.env.NODE_ENV !== 'production' &&
+      process.env.ENABLE_LOCAL_TUNNEL !== 'false' &&
+      fs.existsSync(cfBinary);
+    if (shouldStartTunnel) {
+      startCloudflareTunnel(cfBinary, activePort);
+    }
+  });
+
+  attachListenHandlers(port, attemptsLeft);
+  server.listen(port, '0.0.0.0');
+}
+
+startServer(DEFAULT_PORT);
+
+function startCloudflareTunnel(cfBinary, port) {
   const { spawn } = require('child_process');
   try {
-    const cf = spawn(cfBinary, ['tunnel', '--url', `http://localhost:${PORT}`]);
+    const cf = spawn(cfBinary, ['tunnel', '--url', `http://localhost:${port}`]);
     cf.stderr.on('data', (d) => {
       const text = d.toString();
       const match = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
@@ -496,7 +523,7 @@ function startCloudflareTunnel(cfBinary) {
       }
     });
     cf.on('close', () => {
-      setTimeout(() => startCloudflareTunnel(cfBinary), 4000);
+      setTimeout(() => startCloudflareTunnel(cfBinary, port), 4000);
     });
   } catch (err) {
     console.log('Erro ao iniciar túnel Cloudflare:', err.message);

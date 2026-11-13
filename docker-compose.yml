@@ -4,9 +4,10 @@ services:
     container_name: roomdoku
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${HOST_PORT:-3080}:3080"
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=3080
       # Opcional: defina seu domínio HTTPS público se quiser forçar ele nos links de convite
       # - PUBLIC_URL=https://roomdoku.seudominio.com
+
