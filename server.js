@@ -6,12 +6,13 @@ const os = require('os');
 const { Server } = require('socket.io');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Carregar os tabuleiros oficiais extraídos via REA do Zoodoku APK
 const puzzlesPath = path.join(__dirname, 'public', 'data', 'puzzles.json');
@@ -21,6 +22,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 let publicHttpsUrl = null;
+
+// Healthcheck para Docker / VPS / Load Balancers
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    ok: true,
+    status: 'healthy',
+    uptime: Math.floor(process.uptime())
+  });
+});
 
 // Endpoint informativo sobre estatísticas REA, IPs locais e URL HTTPS pública
 app.get('/api/info', (req, res) => {
@@ -42,7 +52,7 @@ app.get('/api/info', (req, res) => {
   res.json({
     localIps: addresses,
     port: PORT,
-    httpsUrl: publicHttpsUrl,
+    httpsUrl: process.env.PUBLIC_URL || publicHttpsUrl,
     totalUniqueExtractedFromApk: 58160,
     totalInFastPool: totalSaved,
     buckets: bucketCounts
@@ -51,6 +61,18 @@ app.get('/api/info', (req, res) => {
 
 // Armazenamento de salas em memória
 const rooms = new Map();
+
+// Limpeza periódica de salas inativas para evitar acúmulo de memória em VPS
+const ROOM_IDLE_TTL_MS = 2 * 60 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of rooms.entries()) {
+    const anyConnected = Array.from(room.players.values()).some(p => p.connected);
+    if (!anyConnected && now - (room.lastActivityAt || 0) > ROOM_IDLE_TTL_MS) {
+      rooms.delete(code);
+    }
+  }
+}, 15 * 60 * 1000).unref();
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -206,6 +228,7 @@ io.on('connection', (socket) => {
       roundNumber: 0,
       currentPuzzle: null,
       roundStartTime: null,
+      lastActivityAt: Date.now(),
       usedPuzzles: new Set(),
       history: [],
       settings: {
@@ -285,6 +308,7 @@ io.on('connection', (socket) => {
       room.players.set(playerId, player);
     }
 
+    room.lastActivityAt = Date.now();
     socket.join(code);
     io.to(code).emit('room_updated', sanitizeRoomState(room));
     if (cb) cb({ ok: true, room: sanitizeRoomState(room) });
@@ -293,6 +317,7 @@ io.on('connection', (socket) => {
   socket.on('update_settings', (newSettings) => {
     const room = rooms.get(currentRoomCode);
     if (!room || room.hostId !== currentPlayerId) return;
+    room.lastActivityAt = Date.now();
 
     if (newSettings.bucket && puzzlesByBucket[newSettings.bucket]) {
       room.settings.bucket = newSettings.bucket;
@@ -320,6 +345,7 @@ io.on('connection', (socket) => {
     }
 
     room.roundNumber += 1;
+    room.lastActivityAt = Date.now();
     room.currentPuzzle = pickPuzzle(room.settings.bucket, room.usedPuzzles);
     room.status = 'playing';
     room.roundStartTime = Date.now() + 3200; // 3.2s para contagem regressiva 3, 2, 1, JÁ!
@@ -342,6 +368,7 @@ io.on('connection', (socket) => {
     if (!room || room.status !== 'playing') return;
     const player = room.players.get(currentPlayerId);
     if (!player || player.finished || player.eliminated) return;
+    room.lastActivityAt = Date.now();
 
     const N = room.currentPuzzle.n;
     player.placedCount = Math.min(N, Math.max(0, Number(data.placedCount) || 0));
@@ -416,6 +443,7 @@ io.on('connection', (socket) => {
   socket.on('return_to_lobby', () => {
     const room = rooms.get(currentRoomCode);
     if (!room) return;
+    room.lastActivityAt = Date.now();
     room.status = 'lobby';
     io.to(room.code).emit('room_updated', sanitizeRoomState(room));
   });
@@ -424,6 +452,7 @@ io.on('connection', (socket) => {
     if (!currentRoomCode || !currentPlayerId) return;
     const room = rooms.get(currentRoomCode);
     if (!room) return;
+    room.lastActivityAt = Date.now();
     const player = room.players.get(currentPlayerId);
     if (player) {
       player.connected = false;
@@ -439,17 +468,20 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Roomdoku rodando em http://localhost:${PORT}`);
-  startCloudflareTunnel();
+  console.log(`Roomdoku rodando em http://0.0.0.0:${PORT}`);
+  const cfBinary = path.join(__dirname, 'cloudflared.exe');
+  const shouldStartTunnel =
+    process.platform === 'win32' &&
+    process.env.NODE_ENV !== 'production' &&
+    process.env.ENABLE_LOCAL_TUNNEL !== 'false' &&
+    fs.existsSync(cfBinary);
+  if (shouldStartTunnel) {
+    startCloudflareTunnel(cfBinary);
+  }
 });
 
-function startCloudflareTunnel() {
+function startCloudflareTunnel(cfBinary) {
   const { spawn } = require('child_process');
-  const cfBinary = path.join(__dirname, 'cloudflared.exe');
-  if (!fs.existsSync(cfBinary)) {
-    console.log('cloudflared.exe não encontrado localmente.');
-    return;
-  }
   try {
     const cf = spawn(cfBinary, ['tunnel', '--url', `http://localhost:${PORT}`]);
     cf.stderr.on('data', (d) => {
@@ -464,10 +496,23 @@ function startCloudflareTunnel() {
       }
     });
     cf.on('close', () => {
-      setTimeout(startCloudflareTunnel, 4000);
+      setTimeout(() => startCloudflareTunnel(cfBinary), 4000);
     });
   } catch (err) {
     console.log('Erro ao iniciar túnel Cloudflare:', err.message);
   }
 }
+
+function gracefulShutdown(signal) {
+  console.log(`Recebido ${signal}, encerrando Roomdoku...`);
+  io.close(() => {
+    server.close(() => {
+      process.exit(0);
+    });
+  });
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 

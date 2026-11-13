@@ -1,0 +1,9 @@
+node_modules
+.git
+*.apk
+cloudflared.exe
+*.tar.gz
+site-zoodoku
+npm-debug.log*
+.DS_Store
+Thumbs.db

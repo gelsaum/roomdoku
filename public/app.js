@@ -225,19 +225,27 @@ function initHomeUI() {
     document.getElementById('inputRoomCode').value = urlRoom.toUpperCase();
   }
 
-  // Buscar informações do servidor (IP local e URL HTTPS pública com suporte completo a PWA)
+  // Buscar informações do servidor (domínio atual no VPS ou IP local / túnel em dev)
   fetch('/api/info')
     .then(r => r.json())
     .then(info => {
       state.serverInfo = info;
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const ip = info.localIps && info.localIps[0] ? info.localIps[0] : window.location.hostname;
-      const displayUrl = info.httpsUrl || `http://${ip}:${info.port}`;
+      const displayUrl = isLocal
+        ? (info.httpsUrl || `http://${ip}:${info.port}`)
+        : (info.httpsUrl || window.location.origin);
       const wifiEl = document.getElementById('wifiUrlText');
       if (wifiEl) {
         wifiEl.textContent = displayUrl;
       }
     })
-    .catch(() => {});
+    .catch(() => {
+      const wifiEl = document.getElementById('wifiUrlText');
+      if (wifiEl) {
+        wifiEl.textContent = window.location.origin;
+      }
+    });
 }
 
 // Eventos de Botões da Home e Lobby
@@ -413,11 +421,18 @@ document.getElementById('btnLeaveRoom').addEventListener('click', () => {
 // Compartilhar no WhatsApp e Copiar Link
 function getShareUrl() {
   const code = state.room?.code || '';
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const httpsBase = state.serverInfo?.httpsUrl;
   const wifiBase = document.getElementById('wifiUrlText')?.textContent || window.location.origin;
-  const origin = window.location.protocol === 'https:'
-    ? window.location.origin
-    : (httpsBase || (window.location.hostname === 'localhost' && wifiBase.startsWith('http') ? wifiBase : window.location.origin));
+
+  let origin = window.location.origin;
+  if (!isLocal) {
+    if (window.location.protocol !== 'https:' && httpsBase) {
+      origin = httpsBase;
+    }
+  } else {
+    origin = httpsBase || (wifiBase.startsWith('http') ? wifiBase : window.location.origin);
+  }
   return `${origin}/?room=${code}`;
 }
 
