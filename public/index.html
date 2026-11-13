@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2eb840" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Roomdoku" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <title>Roomdoku</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Barra de Topo Compacta Mobile-First -->
+    <header class="topbar">
+      <div class="brand" id="btnHomeLogo" title="Voltar ao Início">
+        <div class="brand-icon">🐼</div>
+        <div>
+          <div class="brand-title">ROOMDOKU <span class="badge-online">ONLINE</span></div>
+          <div class="brand-sub">58.160 Níveis Oficiais</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn install-top-btn" id="btnInstallApp" title="Instalar App no Celular">📲 App</button>
+        <button class="icon-btn" id="btnRules" title="Como Jogar">❓</button>
+        <button class="icon-btn" id="btnSound" title="Som">🔊</button>
+      </div>
+    </header>
+
+    <!-- TELA 1: HOME / CRIAR OU ENTRAR NA SALA -->
+    <main id="screenHome" class="screen active">
+      <div class="hero-card">
+        <div class="hero-header">
+          <h1>Competição Roomdoku 🏆</h1>
+          <p>Mesmo tabuleiro ao vivo! Veja quem resolve mais rápido e ganha mais rodadas.</p>
+        </div>
+
+        <!-- Perfil do Jogador (Sem botões fixos de parentesco, apenas digitar o nome e escolher o animal) -->
+        <div class="profile-box">
+          <div class="field-group">
+            <label for="inputPlayerName">Digite seu Nome:</label>
+            <input type="text" id="inputPlayerName" placeholder="Escreva seu nome aqui..." maxlength="18" autocomplete="off" />
+          </div>
+
+          <label class="sub-label">Escolha seu Animal Guardião:</label>
+          <div class="avatar-grid" id="avatarPicker"></div>
+        </div>
+
+        <!-- Ações Principais: Criar Sala, Entrar com Código -->
+        <div class="home-actions-grid">
+          <div class="action-card primary-card">
+            <div>
+              <h3>🏠 Criar Sala Online</h3>
+              <p>Gere um código de 4 letras ou link para enviar no WhatsApp e jogar todo mundo junto!</p>
+            </div>
+            <button class="btn btn-primary btn-lg w-full" id="btnCreateRoom">
+              Criar Sala Competitiva 🚀
+            </button>
+          </div>
+
+          <div class="action-card secondary-card">
+            <div>
+              <h3>🔑 Entrar com Código</h3>
+              <p>Digite o código de 4 letras da sala criada:</p>
+            </div>
+            <div class="join-row">
+              <input type="text" id="inputRoomCode" class="room-code-input" placeholder="ABCD" maxlength="4" autocomplete="off" />
+              <button class="btn btn-accent btn-lg" id="btnJoinRoom">Entrar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-banners">
+          <div class="solo-banner">
+            <div>
+              <strong>🎯 Modo Treino Solo</strong>
+              <span>Pratique sozinho do 4×4 ao 12×12</span>
+            </div>
+            <button class="btn btn-outline btn-sm" id="btnSoloPlay">Jogar Solo</button>
+          </div>
+
+          <div class="install-banner" id="homeInstallBanner">
+            <div>
+              <strong>📱 Instalar Roomdoku no Celular</strong>
+              <span>Jogue em tela cheia igual aplicativo nativo (iPhone e Android)</span>
+            </div>
+            <button class="btn btn-install btn-sm" id="btnInstallBanner">📲 Instalar App</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TELA 2: LOBBY DA SALA -->
+    <main id="screenLobby" class="screen">
+      <div class="lobby-container">
+        <div class="room-banner">
+          <div class="room-code-box">
+            <span class="room-label">CÓDIGO DA SALA</span>
+            <div class="room-code-display" id="lobbyRoomCode">----</div>
+          </div>
+          <div class="room-share-actions">
+            <button class="btn btn-whatsapp" id="btnShareWhatsapp">📲 WhatsApp</button>
+            <button class="btn btn-outline btn-sm" id="btnCopyLink">🔗 Copiar Link</button>
+          </div>
+        </div>
+
+        <div class="wifi-tip" id="wifiTipBox">
+          💡 <strong>No celular (mesmo Wi-Fi):</strong> abra <span id="wifiUrlText" class="mono-link"></span>
+        </div>
+
+        <div class="lobby-grid">
+          <!-- Lista de Jogadores e Placar Acumulado -->
+          <section class="lobby-panel">
+            <div class="panel-header">
+              <h2>👥 Jogadores na Sala</h2>
+              <span class="badge-count" id="lobbyPlayerCount">1 online</span>
+            </div>
+            <div id="lobbyPlayersList" class="players-list"></div>
+
+            <div class="reaction-bar">
+              <span>Reagir:</span>
+              <button class="emoji-btn" data-emoji="🔥">🔥</button>
+              <button class="emoji-btn" data-emoji="😂">😂</button>
+              <button class="emoji-btn" data-emoji="🐼">🐼</button>
+              <button class="emoji-btn" data-emoji="👀">👀</button>
+              <button class="emoji-btn" data-emoji="❤️">❤️</button>
+              <button class="emoji-btn" data-emoji="🏆">🏆</button>
+            </div>
+          </section>
+
+          <!-- Configurações de Nível da Rodada -->
+          <section class="lobby-panel">
+            <div class="panel-header">
+              <h2>⚙️ Nível da Rodada</h2>
+              <span class="host-badge" id="hostStatusLabel">Configurar</span>
+            </div>
+
+            <div class="settings-form">
+              <label class="setting-label">Tamanho do Tabuleiro:</label>
+              <div class="level-buckets-grid" id="bucketSelector">
+                <button type="button" class="bucket-btn" data-bucket="4">
+                  <strong>4×4</strong><span>Iniciante</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="5">
+                  <strong>5×5</strong><span>Fácil</span>
+                </button>
+                <button type="button" class="bucket-btn active" data-bucket="6">
+                  <strong>6×6</strong><span>Clássico</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="7">
+                  <strong>7×7</strong><span>Médio</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="8">
+                  <strong>8×8</strong><span>Difícil</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="9">
+                  <strong>9×9</strong><span>Mestre</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="10">
+                  <strong>10×10</strong><span>Desafio</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="7_hollow">
+                  <strong>7×7 🕳️</strong><span>Buracos</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="8_hollow">
+                  <strong>8×8 🕳️</strong><span>Buracos</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="14">
+                  <strong>14×14</strong><span>Avançado</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="16">
+                  <strong>16×16</strong><span>Avançado</span>
+                </button>
+                <button type="button" class="bucket-btn" data-bucket="18">
+                  <strong>18×18</strong><span>Avançado</span>
+                </button>
+              </div>
+
+              <div class="setting-row-split">
+                <div class="setting-col">
+                  <label for="selectHearts">❤️ Vidas por Rodada</label>
+                  <select id="selectHearts" class="select-input">
+                    <option value="3" selected>3 Corações (Original)</option>
+                    <option value="5">5 Corações</option>
+                    <option value="0">Vidas Infinitas</option>
+                  </select>
+                </div>
+
+                <div class="setting-col">
+                  <label for="selectRaceMode">🏁 Fim da Rodada</label>
+                  <select id="selectRaceMode" class="select-input">
+                    <option value="all_finish" selected>Todos terminam</option>
+                    <option value="instant_win">1º a fechar encerra</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="setting-row-split">
+                <div class="setting-col">
+                  <label for="selectPenalty">⏱️ Penalidade por Erro</label>
+                  <select id="selectPenalty" class="select-input">
+                    <option value="0" selected>Sem penalidade de tempo</option>
+                    <option value="5">+5 segundos por erro</option>
+                    <option value="10">+10 segundos por erro</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="lobby-start-footer">
+              <button class="btn btn-primary btn-xl w-full" id="btnStartRound">
+                ▶️ INICIAR RODADA AGORA!
+              </button>
+              <button class="btn btn-ghost btn-sm w-full" id="btnLeaveRoom">Sair da Sala</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <!-- TELA 3: JOGO EM TEMPO REAL (OTIMIZADO PARA CELULAR) -->
+    <main id="screenGame" class="screen">
+      <div class="game-layout">
+        <!-- Painel Ao Vivo da Competição -->
+        <section class="live-race-strip" id="liveRaceStrip"></section>
+
+        <!-- HUD do Jogador: Tempo, Corações, Nível e Animal Atual -->
+        <section class="game-hud">
+          <div class="hud-left">
+            <div class="hud-badge" id="hudRoundInfo">R1 • 6×6</div>
+            <div class="hud-hearts" id="hudHearts">❤️❤️❤️</div>
+          </div>
+          <div class="hud-timer" id="hudTimer">00:00.0</div>
+          <div class="hud-right">
+            <div class="hud-placed" id="hudPlacedCount">🐼 0/6</div>
+          </div>
+        </section>
+
+        <!-- Dica Rápida de Jogabilidade Original -->
+        <div class="gesture-hint-bar">
+          <span>👆 <strong>1 Toque ou Arrastar:</strong> Marca/Tira ✖️</span>
+          <span class="dot-sep">•</span>
+          <span>⚡ <strong>2 Toques Rápidos:</strong> Coloca <span id="hintAnimalEmoji">🐼</span></span>
+        </div>
+
+        <!-- Tabuleiro Zoodoku -->
+        <section class="board-wrapper">
+          <div id="boardContainer" class="board-container">
+            <div id="zoodokuBoard" class="zoodoku-board"></div>
+          </div>
+        </section>
+
+        <!-- Barra de Utilitários Limpa (Sem botões de trocar modo, pois o toque/arraste e duplo-toque fazem tudo!) -->
+        <section class="game-controls">
+          <div class="utility-btns">
+            <button type="button" class="util-btn" id="btnUndo" title="Desfazer último X">↩️ Desfazer</button>
+            <button type="button" class="util-btn" id="btnClearCrosses" title="Limpar todos os X manuais">🧹 Limpar X</button>
+            <button type="button" class="util-btn danger-util" id="btnGiveUpRound" title="Voltar à Sala">🏳️ Sair</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- OVERLAY DE CONTAGEM REGRESSIVA 3, 2, 1 -->
+    <div id="countdownOverlay" class="overlay hidden">
+      <div class="countdown-box">
+        <div class="countdown-sub" id="countdownSubText">Mesmo Tabuleiro para Todos!</div>
+        <div class="countdown-number" id="countdownNumber">3</div>
+        <div class="countdown-rule">1 toque ou arraste = ✖️ • 2 toques rápidos = Animal!</div>
+      </div>
+    </div>
+
+    <!-- MODAL DE RESULTADO DA RODADA / PÓDIO -->
+    <div id="roundResultModal" class="modal-backdrop hidden">
+      <div class="modal-card result-modal">
+        <div class="result-header">
+          <div class="trophy-anim" id="resultTrophyIcon">🏆</div>
+          <h2 id="resultTitle">Fim da Rodada!</h2>
+          <p id="resultSubtitle">Confira quem foi mais rápido neste tabuleiro:</p>
+        </div>
+
+        <div id="resultRankingsList" class="result-rankings"></div>
+
+        <div class="overall-standings-box">
+          <h4>📊 Placar Geral Acumulado</h4>
+          <div id="overallStandingsList" class="overall-standings"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-primary btn-lg flex-1" id="btnNextRoundQuick">
+            ⏩ Próxima Rodada
+          </button>
+          <button class="btn btn-outline btn-lg" id="btnBackToLobby">
+            ⚙️ Mudar Nível
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE INSTALAÇÃO DO APP NO CELULAR (iOS / Android) -->
+    <div id="installModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-top">
+          <h2>📲 Instalar App no Celular</h2>
+          <button class="close-btn" id="btnCloseInstall">✖</button>
+        </div>
+        <div class="rules-body">
+          <div class="rule-item">
+            <div class="rule-badge">🍏</div>
+            <div>
+              <strong>No iPhone / iPad (Safari):</strong>
+              <p>1. Toque no botão <strong>Compartilhar</strong> (ícone do quadradinho com seta para cima ⬆️ na barra do Safari).<br>
+              2. Role para baixo e toque em <strong>"Adicionar à Tela de Início"</strong>.<br>
+              3. Toque em <strong>Adicionar</strong>! O ícone do Roomdoku vai aparecer junto com seus aplicativos e abrir em tela cheia sem zoom!</p>
+            </div>
+          </div>
+          <div class="rule-item">
+            <div class="rule-badge">🤖</div>
+            <div>
+              <strong>No Android (Chrome):</strong>
+              <p>1. Toque nos <strong>3 pontinhos (⋮)</strong> no canto superior direito do Chrome.<br>
+              2. Toque em <strong>"Adicionar à tela inicial"</strong> ou <strong>"Instalar aplicativo"</strong>.</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary w-full" id="btnGotItInstall">Perfeito, entendi!</button>
+      </div>
+    </div>
+
+    <!-- MODAL DE REGRAS DO ZOODOKU -->
+    <div id="rulesModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-top">
+          <h2>🐼 Como Jogar Roomdoku</h2>
+          <button class="close-btn" id="btnCloseRules">✖</button>
+        </div>
+        <div class="rules-body">
+          <div class="rule-item">
+            <div class="rule-badge">👆</div>
+            <div>
+              <strong>Controles do Roomdoku</strong>
+              <p>• <strong>1 Toque:</strong> Marca com ✖️ (se tocar de novo, o ✖️ some).<br>
+              • <strong>Arrastar o dedo:</strong> Vai marcando vários quadrados com ✖️ de uma vez!<br>
+              • <strong>2 Toques Rápidos:</strong> Confirma e coloca o seu <strong>Animal</strong> no quadrado!</p>
+            </div>
+          </div>
+          <div class="rule-item">
+            <div class="rule-badge">1</div>
+            <div>
+              <strong>1 Animal por Linha, Coluna e Cor</strong>
+              <p>Cada linha, cada coluna e cada região colorida deve ter exatamente <strong>1 animal</strong>.</p>
+            </div>
+          </div>
+          <div class="rule-item">
+            <div class="rule-badge">2</div>
+            <div>
+              <strong>Animais Não Podem se Tocar!</strong>
+              <p>Dois animais nunca podem ficar colados — <strong>nem mesmo na diagonal</strong>.</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary w-full" id="btnGotItRules">Vamos jogar!</button>
+      </div>
+    </div>
+
+    <!-- CONTAINER DE TOASTS E REAÇÕES VOANDO -->
+    <div id="toastContainer" class="toast-container"></div>
+    <div id="floatingReactions" class="floating-reactions"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
