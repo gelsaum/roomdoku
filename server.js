@@ -474,11 +474,11 @@ function startServer(port, attemptsLeft = 20) {
       if (err.code === 'EADDRINUSE' && remaining > 0) {
         const nextPort = targetPort + 1;
         console.log(`Porta ${targetPort} já está em uso. Tentando porta ${nextPort}...`);
-        server.listen(nextPort, '0.0.0.0');
+        server.listen(nextPort);
         attachListenHandlers(nextPort, remaining - 1);
       } else if (err.code === 'EADDRINUSE') {
         console.log('Selecionando uma porta livre automaticamente...');
-        server.listen(0, '0.0.0.0');
+        server.listen(0);
         attachListenHandlers(0, 0);
       } else {
         throw err;
@@ -502,7 +502,7 @@ function startServer(port, attemptsLeft = 20) {
   });
 
   attachListenHandlers(port, attemptsLeft);
-  server.listen(port, '0.0.0.0');
+  server.listen(port);
 }
 
 startServer(DEFAULT_PORT);

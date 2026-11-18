@@ -1,8 +1,9 @@
 services:
   roomdoku:
     build: .
-    container_name: roomdoku
     restart: unless-stopped
+    expose:
+      - "3080"
     ports:
       - "${HOST_PORT:-3080}:3080"
     environment:
@@ -10,4 +11,10 @@ services:
       - PORT=3080
       # Opcional: defina seu domínio HTTPS público se quiser forçar ele nos links de convite
       # - PUBLIC_URL=https://roomdoku.seudominio.com
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
